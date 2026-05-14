@@ -1,5 +1,4 @@
 using UnityEngine;
-
 [RequireComponent(typeof(CharacterController))]
 public class PlayerController : MonoBehaviour
 {
@@ -10,123 +9,106 @@ public class PlayerController : MonoBehaviour
     public float proneSpeed = 1.8f;
     public float jumpHeight = 2f;
     public float gravity = -20f;
-
     [Header("Mouse Look")]
     public float mouseSensitivity = 100f;
-    public Transform playerCam;
-    private float xRotation = 0f;
-
+    public Transform playerCam; //Child Cam assign in inspector
+    public float xRotation;
     [Header("Crouch")]
     public bool enableCrouch = true;
     public float crouchHeight = 1.2f;
     public float crouchCameraHeight = 0.9f;
     public KeyCode crouchKey = KeyCode.LeftControl;
-
     [Header("Prone")]
     public bool enableProne = true;
     public float proneHeight = 0.6f;
     public float proneCamHeight = 0.35f;
-    public KeyCode proneKey = KeyCode.C;        // You set this to C
-
+    public KeyCode proneKey = KeyCode.C;
     [Header("Sprint Slide")]
     public bool enableSlide = true;
     public float slideDuration = 0.65f;
     public float slideSpeed = 18f;
     public float slideCooldown = 1.5f;
-
     [Header("Shoot/Attack")]
-    public Transform firePoint;
-    public GameObject bulletPrefab;
+    public Transform firePoint; //set with empty child of Player Cam
+    public GameObject bulletPrefab; //Assign prefab in inspector
     public float bulletSpeed = 30f;
-    public float fireRate = 0.2f;
-
-    private CharacterController cc;
+    public float fireRate = 0.2f; //Seconds between shots/attacks
+    private CharacterController characterController;
     private Vector3 velocity;
+    private bool isGrounded;
     private float nextFireTime = 0f;
     private float nextSlideTime = 0f;
-
     private enum Posture { Standing, Crouching, Prone }
     private Posture currentPosture = Posture.Standing;
-
     private bool isSliding = false;
     private float slideTimer = 0f;
-
     private float currentHeight;
     private float targetCamHeight;
 
+    // Start is called once before the first execution of Update after the MonoBehaviour is created
     void Start()
     {
-        cc = GetComponent<CharacterController>();
-
+        characterController = GetComponent<CharacterController>();
+        //Hide and lock cursor
         Cursor.lockState = CursorLockMode.Locked;
         Cursor.visible = false;
-
         if (playerCam == null)
             playerCam = Camera.main.transform;
-
-        currentHeight = cc.height;
+        currentHeight = characterController.height;
         targetCamHeight = 1.6f;
     }
-
+    // Update is called once per frame
     void Update()
     {
-        HandlePostureInput();
+        PostureInput();
         Movement();
         MouseLook();
         Shooting();
-
-        // Debug
-        // Debug.Log("Current Posture: " + currentPosture + " | Sliding: " + isSliding);
     }
-
-    void HandlePostureInput()
+    void PostureInput()
     {
-        // === SPRINT SLIDE (Highest Priority) ===
+        //Sprint Slide (Highest Priority)
         if (enableSlide && Input.GetKeyDown(crouchKey) &&
             Input.GetKey(KeyCode.LeftShift) &&
             currentPosture == Posture.Standing &&
-            cc.isGrounded &&
+            characterController.isGrounded &&
             Time.time >= nextSlideTime)
         {
             StartSlide();
-            return;                    // Prevent crouch from triggering same frame
-        }
-
-        // === PRONE TOGGLE ===
-        if (enableProne && Input.GetKeyDown(proneKey))
-        {
-            currentPosture = (currentPosture == Posture.Prone) ? Posture.Standing : Posture.Prone;
-            if (isSliding) EndSlide();
             return;
         }
 
-        // === CROUCH TOGGLE ===
-        if (enableCrouch && Input.GetKeyDown(crouchKey))
+        //Prone toggle
+        if (enableProne && Input.GetKeyDown(proneKey))
         {
             if (currentPosture == Posture.Prone)
-            {
-                currentPosture = Posture.Crouching;     // Crouch key exits prone into crouch (feels good)
-            }
+                currentPosture = Posture.Standing;
             else
-            {
-                currentPosture = (currentPosture == Posture.Crouching) ? Posture.Standing : Posture.Crouching;
-            }
+                currentPosture = Posture.Prone;
         }
-    }
+        //Crouch toggle
+        else if (enableCrouch && Input.GetKeyDown(crouchKey) && currentPosture != Posture.Prone)
+        {
+            if (currentPosture == Posture.Crouching)
+                currentPosture = Posture.Standing;
+            else
+                currentPosture = Posture.Crouching;
+        }
 
+        Debug.Log("Current Posture is" + currentPosture);
+    }
     void Movement()
     {
-        bool grounded = cc.isGrounded;
-        if (grounded && velocity.y < 0)
+        //Ground check
+        isGrounded = characterController.isGrounded;
+        if (isGrounded && velocity.y < 0)
             velocity.y = -2f;
-
+        //Input
         float moveX = Input.GetAxisRaw("Horizontal");
         float moveZ = Input.GetAxisRaw("Vertical");
         Vector3 move = transform.right * moveX + transform.forward * moveZ;
-
-        // Speed logic
+        //Determine speed based on posture
         float currentSpeed = walkSpeed;
-
         if (isSliding)
         {
             currentSpeed = slideSpeed;
@@ -149,45 +131,38 @@ public class PlayerController : MonoBehaviour
                     break;
             }
         }
-
-        cc.Move(move * currentSpeed * Time.deltaTime);
-
-        // Jump
-        if (Input.GetKeyDown(KeyCode.Space) && grounded && !isSliding && currentPosture != Posture.Prone)
+        //Apply movement
+        characterController.Move(move * currentSpeed * Time.deltaTime);
+        //Jump
+        if (Input.GetKeyDown(KeyCode.Space) && isGrounded && !isSliding && currentPosture != Posture.Prone)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
             if (currentPosture == Posture.Crouching)
                 currentPosture = Posture.Standing;
         }
-
-        // Gravity
+        //Gravity
         velocity.y += gravity * Time.deltaTime;
-        cc.Move(velocity * Time.deltaTime);
-
-        // Smooth transitions
+        characterController.Move(velocity * Time.deltaTime);
+        //Smooth height & Cam transitions
         float targetHeight = GetTargetHeight();
         currentHeight = Mathf.Lerp(currentHeight, targetHeight, 12f * Time.deltaTime);
-
-        cc.height = currentHeight;
-        cc.center = new Vector3(0, currentHeight / 2f, 0);
-
-        // Camera
+        characterController.height = currentHeight;
+        characterController.center = new Vector3(0, currentHeight / 2f, 0);
+        //Camera height
         targetCamHeight = GetTargetCamHeight();
         Vector3 camPos = playerCam.localPosition;
         camPos.y = Mathf.Lerp(camPos.y, targetCamHeight, 12f * Time.deltaTime);
         playerCam.localPosition = camPos;
     }
-
     float GetTargetHeight()
     {
         switch (currentPosture)
         {
             case Posture.Crouching: return crouchHeight;
             case Posture.Prone: return proneHeight;
-            default: return 2f;
+            default: return 2f; //standing
         }
     }
-
     float GetTargetCamHeight()
     {
         switch (currentPosture)
@@ -197,15 +172,13 @@ public class PlayerController : MonoBehaviour
             default: return 1.6f;
         }
     }
-
     void StartSlide()
     {
         isSliding = true;
         slideTimer = slideDuration;
         nextSlideTime = Time.time + slideDuration + slideCooldown;
-        currentPosture = Posture.Crouching;
+        currentPosture = Posture.Crouching; //Force crouch during slide
     }
-
     void EndSlide()
     {
         isSliding = false;
@@ -215,14 +188,13 @@ public class PlayerController : MonoBehaviour
     {
         float mouseX = Input.GetAxis("Mouse X") * mouseSensitivity * Time.deltaTime;
         float mouseY = Input.GetAxis("Mouse Y") * mouseSensitivity * Time.deltaTime;
-
+        //Cam Y Rotation
         xRotation -= mouseY;
         xRotation = Mathf.Clamp(xRotation, -85f, 85f);
-
         playerCam.localRotation = Quaternion.Euler(xRotation, 0f, 0f);
+        //Cam X Rotation
         transform.Rotate(Vector3.up * mouseX);
     }
-
     void Shooting()
     {
         if (Input.GetKey(KeyCode.Mouse0) && Time.time >= nextFireTime)
@@ -231,14 +203,11 @@ public class PlayerController : MonoBehaviour
             Shoot();
         }
     }
-
     void Shoot()
     {
         if (bulletPrefab == null || firePoint == null) return;
-
         GameObject bullet = Instantiate(bulletPrefab, firePoint.position, firePoint.rotation);
         Rigidbody rb = bullet.GetComponent<Rigidbody>();
-
         if (rb != null)
         {
             rb.linearVelocity = firePoint.forward * bulletSpeed;
