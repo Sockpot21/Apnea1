@@ -588,7 +588,7 @@ Transform:
   m_GameObject: {fileID: 1182931832}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 42.2, y: 6.45, z: 12.96905}
+  m_LocalPosition: {x: 42.49, y: 6.45, z: 12.96905}
   m_LocalScale: {x: 10.872, y: 14.029, z: 16.02}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -791,6 +791,7 @@ MonoBehaviour:
   gravity: -20
   mouseSensitivity: 100
   playerCam: {fileID: 809110398}
+  xRotation: 0
   enableCrouch: 1
   crouchHeight: 1.2
   crouchCameraHeight: 0.9

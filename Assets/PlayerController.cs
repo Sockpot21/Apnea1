@@ -12,7 +12,7 @@ public class PlayerController : MonoBehaviour
     [Header("Mouse Look")]
     public float mouseSensitivity = 100f;
     public Transform playerCam; //Child Cam assign in inspector
-    public float xRotation;
+    private float xRotation;
     [Header("Crouch")]
     public bool enableCrouch = true;
     public float crouchHeight = 1.2f;
